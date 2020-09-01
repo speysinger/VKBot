@@ -1,17 +1,30 @@
+import vk_api
+import asyncio
+from vk_api.keyboard import VkKeyboard
+
 class Keyboard:
-    import vk_api
-    from vk_api.keyboard import VkKeyboard
+    def __init__(self):
+        self.controlKeyboard = VkKeyboard(one_time=False, inline=False)
+        self.eventsKeyboard = VkKeyboard(one_time=False, inline=False)
+        self.buttonsColor = "positive"
 
-    keyboard = VkKeyboard(one_time=False, inline=False)
+    def getControlKeyBoard(self):
+        self.registrationButtonText = "Регистрация на мероприятие"
+        self.eventButtonText = "Мои мероприятия"
 
-    buttonsColor = "positive"
-    registrationButtonText = "Регистрация на мероприятие"
-    eventButtonText = "Мои мероприятия"
+        self.controlKeyboard.add_button(self.registrationButtonText, self.buttonsColor)
+        self.controlKeyboard.add_button(self.eventButtonText, self.buttonsColor)
+        return self.controlKeyboard.get_keyboard()
 
-    keyboard.add_button(registrationButtonText, buttonsColor)
-    keyboard.add_button(eventButtonText, buttonsColor)
+    def getEventsKeyBoard(self, events):
+        for event in events:
+            self.eventsKeyboard.add_button(event, self.buttonsColor)
+        return self.eventsKeyboard.get_keyboard()
+    
+    def get_regButtonText(self):
+        return self.registrationButtonText
 
-    def get_keyboard():
-        return keyboard.get_keyboard()
+    def get_eventButtonText(self):
+        return self.eventButtonText
 
 
