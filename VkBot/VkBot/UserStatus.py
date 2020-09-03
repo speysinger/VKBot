@@ -2,10 +2,20 @@ class UserStatus:
     def __init__(self):
         self.currentEvent = ""
         self.eventQuestions = []
+        self.userAnswers = []
         self.currentEventRegisrationStep = 0
+
+    def addAnswer(self, answer):
+        self.userAnswers.append(answer)
 
     def changeRegistrationStep(self):
         self.currentEventRegisrationStep += 1
+
+    def fixPreviousStep(self):
+        if(self.currentEventRegisrationStep > 0):
+            self.currentEventRegisrationStep -= 1
+            return self.userAnswers.pop()
+        return ""
 
     def getCurrentQuestion(self):
         return self.eventQuestions[self.currentEventRegisrationStep]

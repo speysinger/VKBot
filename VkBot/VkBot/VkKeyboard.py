@@ -13,12 +13,18 @@ class Keyboard:
         self.eventButtonText = "Мои мероприятия"
 
         self.controlKeyboard.add_button(self.registrationButtonText, self.buttonsColor)
+        self.controlKeyboard.add_line()
         self.controlKeyboard.add_button(self.eventButtonText, self.buttonsColor)
         return self.controlKeyboard.get_keyboard()
 
-    def getEventsKeyBoard(self, events):
+    def getEventsKeyBoard(self, events):#костыль со строками под кнопками
+        first = True
         for event in events:
+            if(not first):
+                self.eventsKeyboard.add_line()
             self.eventsKeyboard.add_button(event, self.buttonsColor)
+            if(first):
+                first = False
         return self.eventsKeyboard.get_keyboard()
     
     def get_regButtonText(self):
