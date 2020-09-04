@@ -1,15 +1,18 @@
 import Question
 class Events(object):
     def __init__(self):
-        self.eventsList = {
-            'мероприятие1' : [Question.Question('Ваше ФИО', '^[а-яА-ЯёЁ\s]*$', 'Иванов Иван Иванович'),
-                             Question.Question('Ваш номер телефона', '\d{11}', '89506534857')],
-            'мероприятие2' : [Question.Question('ФИО всех членов команды', '^[а-яА-ЯёЁ\s]*$', 'Иванов Иван Иванович, Степанов Степан Степанович ...'),
-                             Question.Question('Номер телефона ответственного', '\d{11}', '89506534857'), 
-                             Question.Question('Название команды', '^[а-яА-ЯёЁ\s]*$', 'Крутые бобры')],
-            'исправить предыдущий шаг': [],
-            'назад': []
-            }
+        self.eventsList = {}
+
+    def addEvent(self, event, questionsList, hintsList, regularsList):
+        questionsArray = []
+        for question, hint, regular in zip(questionsList, hintsList, regularsList):
+            eventQuestion = Question.Question(question, regular, hint)
+            questionsArray.append(eventQuestion)
+        self.eventsList[event] = questionsArray
+
+    def addServiceButtons(self):
+        self.eventsList['исправить предыдущий шаг'] = []
+        self.eventsList['назад'] = []
 
     def getEvents(self):
         return self.eventsList.keys()
@@ -17,11 +20,6 @@ class Events(object):
     def getEventsQuestions(self, eventName):
         return self.eventsList[eventName]
 
-    def recogniseEvent(self, eventName):
-        for x in self.eventsList:
-            if(self.eventsList[text]):
-                return self.eventsList[text]
-        return None;
                 
 
 

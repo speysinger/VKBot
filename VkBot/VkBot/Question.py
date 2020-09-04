@@ -4,7 +4,7 @@ class Question:
         self.regular = regular
         self.hint = hint
 
-    def getQuestion(self):
+    def getQuestionText(self):
         return self.question
 
     def getRegular(self):

@@ -17,6 +17,7 @@ class UserStatus:
             return self.userAnswers.pop()
         return ""
 
+
     def getCurrentQuestion(self):
         return self.eventQuestions[self.currentEventRegisrationStep]
 

@@ -1,5 +1,4 @@
 import vk_api
-import asyncio
 from vk_api.keyboard import VkKeyboard
 
 class Keyboard:
