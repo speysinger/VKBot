@@ -12,7 +12,7 @@ class Events(object):
 
     def addServiceButtons(self):
         self.eventsList['исправить предыдущий шаг'] = []
-        self.eventsList['назад'] = []
+        self.eventsList['отмена регистрации'] = []
 
     def getEvents(self):
         return self.eventsList.keys()
