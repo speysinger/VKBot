@@ -1,9 +1,11 @@
+from datetime import datetime
 class UserStatus:
     def __init__(self):
         self.currentEvent = ""
         self.eventQuestions = []
         self.userAnswers = []
         self.currentEventRegisrationStep = 0
+        self.regDate = datetime
 
     def addAnswer(self, answer):
         self.userAnswers.append(answer)

@@ -2,8 +2,9 @@
 import json
 import VkKeyboard
 import re
-import time
+from datetime import datetime
 from threading import Thread
+import threading
 import UserStatus
 import GoogleSheet
 from vk_api.longpoll import VkLongPoll, VkEventType
@@ -14,8 +15,10 @@ class VkBot:
         self.session_api = self.vk_session.get_api()
         self.longpoll = VkLongPoll(self.vk_session)
 
-        self.googleSheet = GoogleSheet.GoogleSheet()
-        self.googleSheet.createEventsTable()
+        try:
+            self.googleSheet = GoogleSheet.GoogleSheet()
+        except Exception as e:
+            sender(idKogo-to, "Что-то не вышло с гугл файлами, вот текст исключения: " + str(e))
 
         self.keyboard = VkKeyboard.Keyboard()
         self.eventsList = self.googleSheet.getEventsList()
@@ -23,7 +26,27 @@ class VkBot:
         self.controlKeyBoard = self.keyboard.getControlKeyBoard()
         self.eventKeyBoard = self.keyboard.getEventsKeyBoard(self.eventsList)
 
+        self.secondsInDays = 86400
+
         self.userSessions = {}
+        self.inactiveUserDeleter = threading.Timer(self.secondsInDays, self.deleteInactiveUsers)
+        self.inactiveUserDeleter.start()
+
+    def getCurrentDatetime(self):
+        return datetime.now().__format__("%d/%m/%y %H:%M")
+
+    def deleteInactiveUsers(self):
+        nowStr = self.getCurrentDatetime()
+        nowDatetime = datetime.strptime(nowStr, "%d/%m/%y %H:%M")
+
+        for k, v in list(self.userSessions.items()):
+            regDate = datetime.strptime(v.regDate, "%d/%m/%y %H:%M")
+            delta = nowDatetime - regDate
+            if(delta.seconds >= self.secondsInDays):
+                del self.userSessions[k]
+
+        self.t = threading.Timer(self.secondsInDays, self.deleteInactiveUsers)
+        self.t.start()
 
     def makeVkLink(self, id):
         return "https://vk.com/id" + str(id)
@@ -31,9 +54,24 @@ class VkBot:
     def showUserEvents(self, id):
         userEvents = self.googleSheet.getUserEvents(self.makeVkLink(id))
         if(len(userEvents) != 0):
-            self.sender(id, "Ваши мероприятия: " + ','.join(userEvents), None)
+            self.sender(id, "Ваши мероприятия:\n" + '\n'.join(userEvents), None)
         else:
             self.sender(id, 'Вы не зарегистрированы ни на одно мероприятие', self.controlKeyBoard)
+
+    def registerUser(self, id, msg):
+        registered = self.googleSheet.userAlreadyRegistered(msg, self.makeVkLink(id))
+        if(registered):
+            self.sender(id, "Вы уже зарегистрированы на это мероприятие", None)
+            return
+
+        userStatus = UserStatus.UserStatus()
+        userStatus.regDate = self.getCurrentDatetime()
+        userStatus.currentEvent = msg
+        userStatus.eventQuestions = self.googleSheet.getEventQuestions(msg)
+
+        self.userSessions[id] = userStatus
+        question = userStatus.getCurrentQuestion().getQuestionText()
+        self.sender(id, question, None)
 
     def validateMessage(self, pattern, msg):
         regular = re.compile(pattern)
@@ -49,6 +87,7 @@ class VkBot:
 
     def startBot(self):
         for event in self.longpoll.listen():
+            print(threading.active_count())
             if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text:
                 originalMessage = event.text
                 msg = originalMessage.lower()
@@ -76,20 +115,19 @@ class VkBot:
                     self.sender(id, 'Выберите мероприятие', self.eventKeyBoard)
 
                 elif(msg == self.keyboard.get_eventButtonText().lower()):
-                    thread = Thread(target = self.showUserEvents, args = (id,))
-                    thread.start()
+                    userEventsThread = Thread(target = self.showUserEvents, args = (id, ))
+                    userEventsThread.start()
 
+                elif(originalMessage == "SECRET_MESSAGE_TO_UPDATE_EVENT_LIST"):
+                    self.googleSheet.createEventsTable()
+                    self.sender(id, "Выполнил", None)
                 else:
                     if msg in self.eventsList: #если пользователь выбрал какое-то мероприятие
-                        userStatus = UserStatus.UserStatus()
-                        userStatus.currentEvent = msg
-                        userStatus.eventQuestions = self.googleSheet.getEventQuestions(msg)
-
-                        self.userSessions[id] = userStatus
-                        question = userStatus.getCurrentQuestion().getQuestionText()
-                        self.sender(id,question, None)
+                        userRegisterThread = Thread(target = self.registerUser, args = (id, msg, ))
+                        userRegisterThread.start()
                     elif(id in self.userSessions):#этапы регистрации пользователя на мероприятие
                         userStatus = self.userSessions[id]
+                        userStatus.regDate = getCurrentDatetime()
 
                         question = userStatus.getCurrentQuestion()
                         questionText = question.getQuestionText()
@@ -108,13 +146,16 @@ class VkBot:
                             answers = userStatus.getAnswers()
                             answers.append(self.makeVkLink(id))
 
-                            self.googleSheet.insertAnswers(userStatus.getCurrentEvent(), answers)
+                            thread = Thread(target = self.googleSheet.insertAnswers, args = (userStatus.getCurrentEvent(), answers,))
+                            thread.start()
+
                             self.sender(id, "Регистрация окончена.\nВы зарегистрированы на: " + userStatus.currentEvent , self.controlKeyBoard)
                             self.userSessions.pop(id, None)
                         else:
                             userStatus.changeRegistrationStep()
                             questionText = userStatus.getCurrentQuestion().getQuestionText()
                             userStatus.addAnswer(originalMessage)
+
                             self.userSessions[id] = userStatus
                             self.sender(id,questionText, None)
                     else:
