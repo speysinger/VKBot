@@ -30,6 +30,14 @@ class GoogleSheet:
             self.eventsWorkSheets[workSheetTitle] = eventWorkSheet
 
 
+    def getColValues(self, event):
+
+        eventWorkSheet = self.eventsWorkSheets[event]
+        col_count = eventWorkSheet.col_count
+        return eventWorkSheet.col_values(col_count)
+        
+
+
         #убедиться в наличии файла vkEvents
     def createEventsTable(self):
 
@@ -55,9 +63,8 @@ class GoogleSheet:
         self.events.addServiceButtons()
     
     def userAlreadyRegistered(self, event, userLink):
-        eventWorkSheet = self.eventsWorkSheets[event]
-        col_count = eventWorkSheet.col_count
-        valuesInCol = eventWorkSheet.col_values(col_count)
+
+        
         if userLink in valuesInCol:
             return True
         else:
@@ -68,9 +75,7 @@ class GoogleSheet:
         userEvents = []
         for workSheetTitle in self.eventsWorkSheets:
 
-            eventWorkSheet = self.eventsWorkSheets[workSheetTitle]
-            col_count = eventWorkSheet.col_count
-            valuesInCol = eventWorkSheet.col_values(col_count)
+            valuesInCol = self.getColValues(workSheetTitle)
         
             if userLink in valuesInCol:
                 eventStr = workSheetTitle + " - " + str(self.events.getEventDate(workSheetTitle))
@@ -85,6 +90,27 @@ class GoogleSheet:
         eventWorkSheet = self.eventsWorkSheets[event]
         eventWorkSheet.append_row(answers)
 
+    def getEventsUsersCount(self):
+        eventsInfo = ""
+        for workSheetTitle in self.eventsWorkSheets:
+           eventWorkSheet = self.eventsWorkSheets[workSheetTitle]
+           registeredUsers = eventWorkSheet.col_values(1) #заменить на столбец с подтверждениями
+
+           eventInfo = workSheetTitle+ ": зарегистрировано - " + str(len(registeredUsers) - 1) + "\n"
+           eventsInfo += eventInfo
+        return eventsInfo
+
+
+    def getUsersForMailing(self, event):
+        onlyId = lambda x: x.partition("https://vk.com/id")[2]
+
+        usersLinks = self.getColValues(workSheetTitle)
+
+        if(len(usersLinks) > 0):
+            usersLinks.pop(0)
+
+        usersLinks = [*map(onlyId, usersLinks)]
+        return usersLinks
 
     def getEventsList(self):
         return self.events.getEvents()

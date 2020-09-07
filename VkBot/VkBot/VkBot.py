@@ -2,7 +2,7 @@
 import json
 import VkKeyboard
 import re
-from datetime import datetime
+from datetime import timedelta, datetime
 from threading import Thread
 import threading
 import UserStatus
@@ -18,7 +18,7 @@ class VkBot:
         try:
             self.googleSheet = GoogleSheet.GoogleSheet()
         except Exception as e:
-            sender(idKogo-to, "Что-то не вышло с гугл файлами, вот текст исключения: " + str(e))
+            sender(200552768, "Что-то не вышло с гугл файлами, вот текст исключения: " + str(e))
 
         self.keyboard = VkKeyboard.Keyboard()
         self.eventsList = self.googleSheet.getEventsList()
@@ -26,11 +26,41 @@ class VkBot:
         self.controlKeyBoard = self.keyboard.getControlKeyBoard()
         self.eventKeyBoard = self.keyboard.getEventsKeyBoard(self.eventsList)
 
-        self.secondsInDays = 86400
 
+        #adminPart
+        self.testPassword = "zdarova2"
+        self.adminId = -1
+        self.mailingEvent = ""
+        self.mailingText = ""
+        self.adminActions = {
+            'установить текст рассылки': self.setMailing,
+            'сменить текст рассылки': self.setMailing,
+            'просмотреть количество зарегистрированных участников': self.showRegisteredUsers
+            }
+        #adminPart
+
+        self.secondsInDays = 86400
         self.userSessions = {}
-        self.inactiveUserDeleter = threading.Timer(self.secondsInDays, self.deleteInactiveUsers)
+
+        self.inactiveUserDeleter = threading.Timer(self.getSecondsToNight(), self.deleteInactiveUsers)
         self.inactiveUserDeleter.start()
+
+    def startMailing(self, usersId):
+        for userId in usersId:
+            self.sender(userId, self.mailingText, None)
+
+    def setMailing(self, adminId, textMailing):
+        self.mailingText = textMailing
+
+    def showRegisteredUsers(self, adminId, uselessParam):
+        info = self.googleSheet.getEventsUsersCount()
+        sender(adminId, info, None)
+
+    def getSecondsToNight(self):
+        now = datetime.now()
+        nextUpdateTime = (now + timedelta(days = 1)).replace(minute = 0, hour = 4) #4 утра(ночи) следующего дня
+        delta = nextUpdateTime - now
+        return delta.seconds
 
     def getCurrentDatetime(self):
         return datetime.now().__format__("%d/%m/%y %H:%M")
@@ -42,11 +72,43 @@ class VkBot:
         for k, v in list(self.userSessions.items()):
             regDate = datetime.strptime(v.regDate, "%d/%m/%y %H:%M")
             delta = nowDatetime - regDate
+
             if(delta.seconds >= self.secondsInDays):
                 del self.userSessions[k]
 
-        self.t = threading.Timer(self.secondsInDays, self.deleteInactiveUsers)
-        self.t.start()
+        
+        t = threading.Timer(self.getSecondsToNight(), self.deleteInactiveUsers)
+        t.start()
+
+    def validateAdminCommand(self, adminId, adminCommand):
+        words = adminCommand.split('\n')
+        if(len(words) < 4):
+            self.sender(adminId, "Сообщение не удовлетворяет формату", None)
+            return False
+
+        password = words[0].rstrip()
+        if(password != self.testPassword):
+            self.sender(adminId, "Неверный пароль", None)
+            return False
+
+        eventName = words[1].rstrip().lower()
+        if(eventName not in self.eventsList):
+            self.sender(adminId, "Мероприятие не найдено", None)
+            return False
+
+        action = words[2].rstrip().lower()
+        if action not in self.adminActions:
+            self.sender(adminId, "Действие не найдено", None)
+            return False
+
+        del words[0:3]
+
+        mailingText = '\n'.join(words)
+        self.adminActions[action](adminId, mailingText)
+        self.mailingEvent = eventName
+        self.adminId = adminId
+        return True
+
 
     def makeVkLink(self, id):
         return "https://vk.com/id" + str(id)
@@ -87,7 +149,6 @@ class VkBot:
 
     def startBot(self):
         for event in self.longpoll.listen():
-            print(threading.active_count())
             if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text:
                 originalMessage = event.text
                 msg = originalMessage.lower()
@@ -109,7 +170,7 @@ class VkBot:
                     previousQuestion = userStatus.getCurrentQuestion().getQuestionText()
 
                     self.sender(id, "Ваш предыдущий вопрос: " + previousQuestion + "\nВаш предыдущий ответ: " + previousAnswer + "\nВведите ответ: ", None)
-                    uself.serSessions[id] = userStatus
+                    self.userSessions[id] = userStatus
 
                 elif(msg == self.keyboard.get_regButtonText().lower()):
                     self.sender(id, 'Выберите мероприятие', self.eventKeyBoard)
@@ -119,12 +180,32 @@ class VkBot:
                     userEventsThread.start()
 
                 elif(originalMessage == "SECRET_MESSAGE_TO_UPDATE_EVENT_LIST"):
-                    self.googleSheet.createEventsTable()
+                    updateEventsThread = Thread(target = self.googleSheet.createEventsTable, args = ())
+                    updateEventsThread.start()
                     self.sender(id, "Выполнил", None)
+ 
+                elif(self.testPassword in msg):
+                    validated = self.validateAdminCommand(id, originalMessage)
+                    if(validated):
+                        self.sender(id, "Подтвердите начало рассылки уведомления:\n" + self.mailingText + "\n участникам мероприятия: " + self.mailingEvent
+                               + "\n отправив в ответ да/нет", None)
+
+                elif(id == self.adminId and (msg == "да" or msg == "нет")):
+                    if(len(self.mailingText) != 0 and self.adminId != 0):
+                        mailingUsers = self.googleSheet.getUsersForMailing(self.mailingEvent)
+                        mailingThread = Thread(target = self.startMailing, args = (mailingUsers, ))
+                        mailingThread.start()
+
+                        self.adminId = -1
+                        self.mailingEvent = ""
+                    else:
+                        self.sender(id, "Я не понял", self.controlKeyBoard)
+
                 else:
                     if msg in self.eventsList: #если пользователь выбрал какое-то мероприятие
                         userRegisterThread = Thread(target = self.registerUser, args = (id, msg, ))
                         userRegisterThread.start()
+
                     elif(id in self.userSessions):#этапы регистрации пользователя на мероприятие
                         userStatus = self.userSessions[id]
                         userStatus.regDate = getCurrentDatetime()
@@ -157,6 +238,6 @@ class VkBot:
                             userStatus.addAnswer(originalMessage)
 
                             self.userSessions[id] = userStatus
-                            self.sender(id,questionText, None)
+                            self.sender(id, questionText, None)
                     else:
                         self.sender(id, "Я не понял", self.controlKeyBoard)
