@@ -21,23 +21,26 @@ class Keyboard:
         index = 0
         eventsLen = len(events)
         even = False
-        beforeLastTwoButtons = eventsLen - 2
 
         if(eventsLen % 2 == 0):
             even = True
 
         for event in events:
-            if(index != 0 and (index % 2 == 0 or (not even and index == beforeLastTwoButtons))):
+            if(index != 0 and (index % 2 == 0 or (not even and index == eventsLen))):
                 self.eventsKeyboard.add_line()
 
-            if(index >= beforeLastTwoButtons):
-                self.eventsKeyboard.add_button(event, self.serviceButtonsColor)
-            else:
-                self.eventsKeyboard.add_button(event, self.buttonsColor)
+            self.eventsKeyboard.add_button(event, self.buttonsColor)
 
             index += 1
+        self.addServiceButtons()
         return self.eventsKeyboard.get_keyboard()
     
+    def addServiceButtons(self):
+        self.eventsKeyboard.add_line()
+        self.eventsKeyboard.add_button('исправить предыдущий шаг', self.serviceButtonsColor)
+        self.eventsKeyboard.add_button('отмена регистрации', self.serviceButtonsColor)
+
+
     def get_regButtonText(self):
         return self.registrationButtonText
 

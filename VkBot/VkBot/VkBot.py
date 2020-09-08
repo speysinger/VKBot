@@ -7,6 +7,7 @@ from threading import Thread
 import threading
 import UserStatus
 import GoogleSheet
+import Event
 from vk_api.longpoll import VkLongPoll, VkEventType
 
 class VkBot:
@@ -18,14 +19,13 @@ class VkBot:
         try:
             self.googleSheet = GoogleSheet.GoogleSheet()
         except Exception as e:
-            sender(200552768, "Что-то не вышло с гугл файлами, вот текст исключения: " + str(e))
+            self.sender(200552768, "Что-то не вышло с гугл файлами, вот текст исключения: " + str(e) + "\nЯ, кстати, упал", None)
 
         self.keyboard = VkKeyboard.Keyboard()
         self.eventsList = self.googleSheet.getEventsList()
 
         self.controlKeyBoard = self.keyboard.getControlKeyBoard()
         self.eventKeyBoard = self.keyboard.getEventsKeyBoard(self.eventsList)
-
 
         #adminPart
         self.testPassword = "zdarova2"
@@ -39,11 +39,46 @@ class VkBot:
             }
         #adminPart
 
-        self.secondsInDays = 86400
         self.userSessions = {}
+        self.confirmationList = {}
 
-        self.inactiveUserDeleter = threading.Timer(self.getSecondsToNight(), self.deleteInactiveUsers)
+        nightTime = self.getNightDatetime()
+        self.createConfirmationMailing()
+        self.inactiveUserDeleter = threading.Timer(self.getSecondsToDate(nightTime), self.deleteInactiveUsers)
         self.inactiveUserDeleter.start()
+
+    def createConfirmationMailing(self):
+        eventsList = self.googleSheet.getEventsList()
+
+        for eventName in eventsList:
+            event = self.googleSheet.getEvent(eventName)
+            eventConfirmation = event.getConfirmation()
+
+            if(eventConfirmation == 'с подтверждением'):
+                eventDate = event.getEventDate()
+                eventDatetime = datetime.strptime(eventDate, '%d/%m/%y %H:%M')
+                beforeEventDateTime = (eventDatetime - timedelta(days = 1)).replace(minute = 0, hour = 9)
+                secondsToEventConfirmation = self.getSecondsToDate(beforeEventDateTime)
+
+                if(secondsToEventConfirmation <= 0):
+                    secondsToEventConfirmation = 0
+
+                threading.Timer(secondsToEventConfirmation, self.startEventMailing, [eventName]).start()
+                
+
+    def getNightDatetime(self):
+        now = datetime.now()
+        nextUpdateTime = (now + timedelta(days = 1)).replace(minute = 0, hour = 4)
+        return nextUpdateTime
+
+    def startEventMailing(self, eventName):
+        usersForConfirmationMailing = self.googleSheet.getUsersForMailing(eventName)
+        Thread(target = self.startConfirmation, args = (usersForConfirmationMailing, eventName,)).start()
+
+    def startConfirmation(self, usersForConfirmationMailing, eventName):
+        for userId in usersForConfirmationMailing:
+            self.sender(userId, "Подвердите участие на мероприятии: " + eventName + "\n Отправив в ответ да/нет", None)
+            self.confirmationList[int(userId)] = eventName
 
     def startMailing(self, usersId):
         for userId in usersId:
@@ -56,11 +91,10 @@ class VkBot:
         info = self.googleSheet.getEventsUsersCount()
         sender(adminId, info, None)
 
-    def getSecondsToNight(self):
+    def getSecondsToDate(self, eventConfirmationTime):
         now = datetime.now()
-        nextUpdateTime = (now + timedelta(days = 1)).replace(minute = 0, hour = 4) #4 утра(ночи) следующего дня
-        delta = nextUpdateTime - now
-        return delta.seconds
+        delta = eventConfirmationTime - now
+        return delta.total_seconds()
 
     def getCurrentDatetime(self):
         return datetime.now().__format__("%d/%m/%y %H:%M")
@@ -76,8 +110,8 @@ class VkBot:
             if(delta.seconds >= self.secondsInDays):
                 del self.userSessions[k]
 
-        
-        t = threading.Timer(self.getSecondsToNight(), self.deleteInactiveUsers)
+        nextUpdateTime = self.getNightDatetime()
+        t = threading.Timer(self.getSecondsToDate(nextUpdateTime), self.deleteInactiveUsers)
         t.start()
 
     def validateAdminCommand(self, adminId, adminCommand):
@@ -108,7 +142,6 @@ class VkBot:
         self.mailingEvent = eventName
         self.adminId = adminId
         return True
-
 
     def makeVkLink(self, id):
         return "https://vk.com/id" + str(id)
@@ -190,6 +223,13 @@ class VkBot:
                         self.sender(id, "Подтвердите начало рассылки уведомления:\n" + self.mailingText + "\n участникам мероприятия: " + self.mailingEvent
                                + "\n отправив в ответ да/нет", None)
 
+                elif((id in self.confirmationList) and (msg == "да" or msg == "нет")):
+                    eventName = self.confirmationList[id]
+                    confirmationThread = Thread(target = self.googleSheet.addUserConfirmationStatus, args = (eventName, self.makeVkLink(id), msg ))
+                    confirmationThread.start()
+                    del self.confirmationList[id]
+                    self.sender(id, "Ответ внесён", None)
+
                 elif(id == self.adminId and (msg == "да" or msg == "нет")):
                     if(len(self.mailingText) != 0 and self.adminId != 0):
                         mailingUsers = self.googleSheet.getUsersForMailing(self.mailingEvent)
@@ -201,6 +241,7 @@ class VkBot:
                     else:
                         self.sender(id, "Я не понял", self.controlKeyBoard)
 
+
                 else:
                     if msg in self.eventsList: #если пользователь выбрал какое-то мероприятие
                         userRegisterThread = Thread(target = self.registerUser, args = (id, msg, ))
@@ -208,7 +249,7 @@ class VkBot:
 
                     elif(id in self.userSessions):#этапы регистрации пользователя на мероприятие
                         userStatus = self.userSessions[id]
-                        userStatus.regDate = getCurrentDatetime()
+                        userStatus.regDate = self.getCurrentDatetime()
 
                         question = userStatus.getCurrentQuestion()
                         questionText = question.getQuestionText()
@@ -225,6 +266,7 @@ class VkBot:
                             userStatus.addAnswer(originalMessage)
 
                             answers = userStatus.getAnswers()
+                            answers.append('-')
                             answers.append(self.makeVkLink(id))
 
                             thread = Thread(target = self.googleSheet.insertAnswers, args = (userStatus.getCurrentEvent(), answers,))
