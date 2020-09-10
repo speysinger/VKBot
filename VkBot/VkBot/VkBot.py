@@ -71,6 +71,14 @@ class VkBot:
         nextUpdateTime = (now + timedelta(days = 1)).replace(minute = 0, hour = 4)
         return nextUpdateTime
 
+    def updateEventsList(self):
+        self.googleSheet.createEventsTable()
+        self.eventsList = self.googleSheet.getEventsList()
+        self.eventKeyBoard = self.keyboard.getEventsKeyBoard(self.eventsList)
+        self.sender(id, "Выполнил", None)
+
+
+
     def startEventMailing(self, eventName):
         usersForConfirmationMailing = self.googleSheet.getUsersForMailing(eventName)
         Thread(target = self.startConfirmation, args = (usersForConfirmationMailing, eventName,)).start()
@@ -109,6 +117,10 @@ class VkBot:
 
             if(delta.seconds >= self.secondsInDays):
                 del self.userSessions[k]
+
+        for k, v in list(self.confirmationList.items()):
+            if value not in self.eventsList:
+                del self.confirmationList[k]
 
         nextUpdateTime = self.getNightDatetime()
         t = threading.Timer(self.getSecondsToDate(nextUpdateTime), self.deleteInactiveUsers)
@@ -213,9 +225,9 @@ class VkBot:
                     userEventsThread.start()
 
                 elif(originalMessage == "SECRET_MESSAGE_TO_UPDATE_EVENT_LIST"):
-                    updateEventsThread = Thread(target = self.googleSheet.createEventsTable, args = ())
+                    updateEventsThread = Thread(target = self.updateEventsList, args = ())
                     updateEventsThread.start()
-                    self.sender(id, "Выполнил", None)
+                    
  
                 elif(self.testPassword in msg):
                     validated = self.validateAdminCommand(id, originalMessage)
@@ -266,7 +278,7 @@ class VkBot:
                             userStatus.addAnswer(originalMessage)
 
                             answers = userStatus.getAnswers()
-                            answers.append('-')
+                            answers.append('ответа нет')
                             answers.append(self.makeVkLink(id))
 
                             thread = Thread(target = self.googleSheet.insertAnswers, args = (userStatus.getCurrentEvent(), answers,))
