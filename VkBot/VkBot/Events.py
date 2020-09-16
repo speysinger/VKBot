@@ -3,11 +3,19 @@ import Event
 class Events(object):
     def __init__(self):
         self.eventsList = {}
+        self.regularExpressions = {
+            'телефон': '\d{11}',
+            'почта' : '.+@.+\..+',
+            'число': '[0-9]',
+            'строка': '^[а-яА-ЯёЁ\s]*$',
+            'любое': ''
+        }
 
     def addEvent(self, eventName, eventDate, needConfirmation, questionsList, hintsList, regularsList):
         questionsArray = []
         for question, hint, regular in zip(questionsList, hintsList, regularsList):
-            eventQuestion = Question.Question(question, regular, hint)
+            recognisedRegExp = self.regularExpressions.setdefault(regular, '')
+            eventQuestion = Question.Question(question, recognisedRegExp, hint)
             questionsArray.append(eventQuestion)
 
         event = Event.Event(questionsArray, eventDate, needConfirmation)

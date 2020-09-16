@@ -21,15 +21,7 @@ class GoogleSheet:
         self.eventsWorkSheets = {}
         self.events = Events.Events()
 
-        self.fillWorkSheetsList()
         self.createEventsTable()
-
-    def fillWorkSheetsList(self):
-        workSheetsList = self.questionsSpreadSheet.worksheets() #список всех листов в таблице с вопросами
-        for workSheet in workSheetsList:
-            workSheetTitle = workSheet.title
-            eventWorkSheet = self.eventsSpreadSheet.worksheet(workSheetTitle)
-            self.eventsWorkSheets[workSheetTitle] = eventWorkSheet
 
     def getColValues(self, eventName):
         eventWorkSheet = self.eventsWorkSheets[eventName]
@@ -42,6 +34,7 @@ class GoogleSheet:
         workSheetsList = self.questionsSpreadSheet.worksheets()
         for workSheet in workSheetsList:
 
+            insertPlace = -1
             workSheetTitle = workSheet.title
             questionsList = workSheet.col_values(1)
             hintsList = workSheet.col_values(2)
@@ -49,8 +42,13 @@ class GoogleSheet:
             needConfirmation = workSheet.cell(1,4).value.lower()
             eventDate = workSheet.cell(1,6).value
 
+            agreement = questionsList[-1]
+            del questionsList[-1]
+
+            insertPlace = len(questionsList)
             try:
                 existedWorkSheet = self.eventsSpreadSheet.worksheet(workSheetTitle)
+                self.eventsWorkSheets[workSheetTitle] = existedWorkSheet
             except Exception:
                 if(needConfirmation == "с подтверждением"):
                     questionsList.append("Будет участвовать")
@@ -60,6 +58,12 @@ class GoogleSheet:
 
                 eventWorkSheet = self.eventsSpreadSheet.add_worksheet(title = workSheetTitle, rows = "500", cols = len(questionsList))
                 eventWorkSheet.append_row(questionsList)
+                self.eventsWorkSheets[workSheetTitle] = eventWorkSheet
+                insertPlace = len(questionsList)-2
+
+            questionsList.insert(insertPlace, agreement)
+            hintsList.append('')
+            regularsList.append('')
 
             self.events.addEvent(workSheetTitle, eventDate, needConfirmation, questionsList, hintsList, regularsList)
     

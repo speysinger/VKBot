@@ -5,8 +5,13 @@ class Keyboard:
     def __init__(self):
         self.controlKeyboard = VkKeyboard(one_time=False, inline=False)
         self.eventsKeyboard = VkKeyboard(one_time=False, inline=False)
+        self.yesKeyBoard = VkKeyboard(one_time = False, inline = False)
         self.buttonsColor = "positive"
         self.serviceButtonsColor = 'negative'
+
+    def getYesKeyBoard(self):
+        self.yesKeyBoard.add_button("Да", self.buttonsColor)
+        return self.yesKeyBoard.get_keyboard()
 
     def getControlKeyBoard(self):
         self.registrationButtonText = "Регистрация на мероприятие"

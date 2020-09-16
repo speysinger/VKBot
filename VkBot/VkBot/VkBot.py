@@ -12,7 +12,7 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 
 class VkBot:
     def __init__(self):
-        self.vk_session = vk_api.VkApi(token = "bc869b29041d5059d84fdb9bb230c55faafbfa6bfd210361a62e33d212dc7b0c90f393187a92f0f6a1803")
+        self.vk_session = vk_api.VkApi(token = "")
         self.session_api = self.vk_session.get_api()
         self.longpoll = VkLongPoll(self.vk_session)
 
@@ -26,6 +26,7 @@ class VkBot:
 
         self.controlKeyBoard = self.keyboard.getControlKeyBoard()
         self.eventKeyBoard = self.keyboard.getEventsKeyBoard(self.eventsList)
+        self.yesKeyBoard = self.keyboard.getYesKeyBoard()
 
         #adminPart
         self.testPassword = "zdarova2"
@@ -255,8 +256,8 @@ class VkBot:
 
 
                 else:
-                    if msg in self.eventsList: #если пользователь выбрал какое-то мероприятие
-                        userRegisterThread = Thread(target = self.registerUser, args = (id, msg, ))
+                    if originalMessage in self.eventsList: #если пользователь выбрал какое-то мероприятие
+                        userRegisterThread = Thread(target = self.registerUser, args = (id, originalMessage, ))
                         userRegisterThread.start()
 
                     elif(id in self.userSessions):#этапы регистрации пользователя на мероприятие
@@ -274,8 +275,13 @@ class VkBot:
                             self.sender(id, "Некорретный формат сообщения\n" + "Пример ответа: " + questionHint, None)
                             continue
             
-                        if(userStatus.interviewEnded()):
-                            userStatus.addAnswer(originalMessage)
+
+                        if(userStatus.lastQuestion()):
+                            if(msg != 'да'):
+                                self.sender(id, "Для продолжения нажмите \"Да\"", None)
+                                continue
+
+                            #userStatus.addAnswer(originalMessage)
 
                             answers = userStatus.getAnswers()
                             answers.append('ответа нет')
@@ -284,14 +290,18 @@ class VkBot:
                             thread = Thread(target = self.googleSheet.insertAnswers, args = (userStatus.getCurrentEvent(), answers,))
                             thread.start()
 
-                            self.sender(id, "Регистрация окончена.\nВы зарегистрированы на: " + userStatus.currentEvent , self.controlKeyBoard)
+                            self.sender(id, "Регистрация закончена.\nВы зарегистрированы на: " + userStatus.currentEvent , self.controlKeyBoard)
                             self.userSessions.pop(id, None)
                         else:
                             userStatus.changeRegistrationStep()
-                            questionText = userStatus.getCurrentQuestion().getQuestionText()
                             userStatus.addAnswer(originalMessage)
 
+                            questionText = userStatus.getCurrentQuestion().getQuestionText()
+
                             self.userSessions[id] = userStatus
-                            self.sender(id, questionText, None)
+                            if(userStatus.lastQuestion()):
+                                self.sender(id, questionText, self.yesKeyBoard)
+                            else:
+                                self.sender(id, questionText, None)
                     else:
                         self.sender(id, "Я не понял", self.controlKeyBoard)
