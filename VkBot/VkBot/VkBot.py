@@ -78,8 +78,6 @@ class VkBot:
         self.eventKeyBoard = self.keyboard.getEventsKeyBoard(self.eventsList)
         self.sender(id, "Выполнил", None)
 
-
-
     def startEventMailing(self, eventName):
         usersForConfirmationMailing = self.googleSheet.getUsersForMailing(eventName)
         Thread(target = self.startConfirmation, args = (usersForConfirmationMailing, eventName,)).start()
@@ -179,7 +177,7 @@ class VkBot:
 
         self.userSessions[id] = userStatus
         question = userStatus.getCurrentQuestion().getQuestionText()
-        self.sender(id, question, None)
+        self.sender(id, question, self.yesKeyBoard)
 
     def validateMessage(self, pattern, msg):
         regular = re.compile(pattern)
@@ -275,13 +273,9 @@ class VkBot:
                             self.sender(id, "Некорретный формат сообщения\n" + "Пример ответа: " + questionHint, None)
                             continue
             
-
+      
                         if(userStatus.lastQuestion()):
-                            if(msg != 'да'):
-                                self.sender(id, "Для продолжения нажмите \"Да\"", None)
-                                continue
-
-                            #userStatus.addAnswer(originalMessage)
+                            userStatus.addAnswer(originalMessage)
 
                             answers = userStatus.getAnswers()
                             answers.append('ответа нет')
@@ -293,15 +287,20 @@ class VkBot:
                             self.sender(id, "Регистрация закончена.\nВы зарегистрированы на: " + userStatus.currentEvent , self.controlKeyBoard)
                             self.userSessions.pop(id, None)
                         else:
-                            userStatus.changeRegistrationStep()
-                            userStatus.addAnswer(originalMessage)
+                            if(userStatus.firstQuestion()):
+                                if(msg != 'да'):
+                                    self.sender(id, "Для продолжения нажмите \"Да\"", None)
+                                    continue                        
 
-                            questionText = userStatus.getCurrentQuestion().getQuestionText()
-
-                            self.userSessions[id] = userStatus
-                            if(userStatus.lastQuestion()):
-                                self.sender(id, questionText, self.yesKeyBoard)
+                            if(userStatus.firstQuestion()):
+                                userStatus.changeRegistrationStep()
+                                questionText = userStatus.getCurrentQuestion().getQuestionText()
+                                self.sender(id, questionText, self.eventKeyBoard)
                             else:
+                                userStatus.changeRegistrationStep()
+                                userStatus.addAnswer(originalMessage)
+                                questionText = userStatus.getCurrentQuestion().getQuestionText()
+                                self.userSessions[id] = userStatus
                                 self.sender(id, questionText, None)
                     else:
                         self.sender(id, "Я не понял", self.controlKeyBoard)

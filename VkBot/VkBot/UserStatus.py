@@ -28,6 +28,11 @@ class UserStatus:
     def getCurrentQuestion(self):
         return self.eventQuestions[self.currentEventRegisrationStep]
 
+    def firstQuestion(self):
+        if(self.currentEventRegisrationStep == 0):
+            return True;
+        return False;
+
     def lastQuestion(self):
         if(self.currentEventRegisrationStep + 1 == len(self.eventQuestions)):
             return True;

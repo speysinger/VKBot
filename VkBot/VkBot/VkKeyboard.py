@@ -11,6 +11,7 @@ class Keyboard:
 
     def getYesKeyBoard(self):
         self.yesKeyBoard.add_button("Да", self.buttonsColor)
+        self.yesKeyBoard.add_button('Отмена регистрации', self.serviceButtonsColor)
         return self.yesKeyBoard.get_keyboard()
 
     def getControlKeyBoard(self):
