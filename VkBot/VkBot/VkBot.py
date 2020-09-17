@@ -200,7 +200,7 @@ class VkBot:
                 if(msg == "начать"):
                     self.sender(id, "Выберите действие", self.controlKeyBoard)
 
-                elif(msg == "отмена регистрации"):
+                elif(msg == "назад"):
                     self.userSessions.pop(id, None)
                     self.sender(id, "Выберите действие", self.controlKeyBoard)
 

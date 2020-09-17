@@ -14,7 +14,7 @@ class UserStatus:
         self.currentEventRegisrationStep += 1
 
     def fixPreviousStep(self):
-        if(self.currentEventRegisrationStep > 0):
+        if(self.currentEventRegisrationStep > 0 and len(self.userAnswers)):
             self.currentEventRegisrationStep -= 1
             return self.userAnswers.pop()
         return ""

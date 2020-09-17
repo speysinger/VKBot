@@ -44,7 +44,7 @@ class Keyboard:
     def addServiceButtons(self):
         self.eventsKeyboard.add_line()
         self.eventsKeyboard.add_button('исправить предыдущий шаг', self.serviceButtonsColor)
-        self.eventsKeyboard.add_button('отмена регистрации', self.serviceButtonsColor)
+        self.eventsKeyboard.add_button('Назад', self.serviceButtonsColor)
 
 
     def get_regButtonText(self):
