@@ -93,10 +93,11 @@ class GoogleSheet:
         eventsInfo = ""
         for workSheetTitle in self.eventsWorkSheets:
            eventWorkSheet = self.eventsWorkSheets[workSheetTitle]
-           col_count = self.eventsWorkSheets[eventName].col_count
+           col_count = eventWorkSheet.col_count
            confirmedStatuses = eventWorkSheet.col_values(col_count - 1)
            confirmed = 0
            rejected = 0
+           registeredUsers = 0
 
            for confirmStatus in confirmedStatuses:
                if(confirmStatus.lower() == "да"):
@@ -104,8 +105,12 @@ class GoogleSheet:
                    continue
                if(confirmStatus.lower() == "нет"):
                    rejected += 1
+               registeredUsers += 1
 
-           eventInfo = workSheetTitle + ": зарегистрировано - " + str(len(registeredUsers) - 1) + ", подтвердили участие - " + str(confirmed) + ", отказались от участия - " + str(rerejected)
+           if(registeredUsers != 0):
+               registeredUsers -= 1
+
+           eventInfo = workSheetTitle + ": зарегистрировано - " + str(registeredUsers) + ", подтвердили участие - " + str(confirmed) + ", отказались от участия - " + str(rejected) + "\n"
            eventsInfo += eventInfo
         return eventsInfo
 

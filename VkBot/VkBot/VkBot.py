@@ -30,11 +30,9 @@ class VkBot:
 
         #adminPart
         self.testPassword = "zdarova2"
-        self.adminId = -1
-        self.mailingEvent = ""
-        self.mailingText = ""
+        self.clearAdminValues()
         self.adminActions = {
-            'установить текст рассылки': self.setMailing,
+            'начать рассылку': self.confirmationBeforeMailing,
             'сменить текст рассылки': self.setMailing,
             'просмотреть количество зарегистрированных участников': self.showRegisteredUsers
             }
@@ -47,6 +45,11 @@ class VkBot:
         self.createConfirmationMailing()
         self.inactiveUserDeleter = threading.Timer(self.getSecondsToDate(nightTime), self.deleteInactiveUsers)
         self.inactiveUserDeleter.start()
+
+    def clearAdminValues(self):
+        self.adminId = -1
+        self.mailingEvent = ""
+        self.mailingText = ""
 
     def createConfirmationMailing(self):
         eventsList = self.googleSheet.getEventsList()
@@ -78,6 +81,11 @@ class VkBot:
         self.eventKeyBoard = self.keyboard.getEventsKeyBoard(self.eventsList)
         self.sender(id, "Выполнил", None)
 
+    def preStartMailing(self):
+        mailingUsers = self.googleSheet.getUsersForMailing(self.mailingEvent)
+        mailingThread = Thread(target = self.startMailing, args = (mailingUsers, ))
+        mailingThread.start()
+
     def startEventMailing(self, eventName):
         usersForConfirmationMailing = self.googleSheet.getUsersForMailing(eventName)
         Thread(target = self.startConfirmation, args = (usersForConfirmationMailing, eventName,)).start()
@@ -91,12 +99,20 @@ class VkBot:
         for userId in usersId:
             self.sender(userId, self.mailingText, None)
 
+        self.clearAdminValues()
+
     def setMailing(self, adminId, textMailing):
         self.mailingText = textMailing
 
+
+    def confirmationBeforeMailing(self, adminId, textMailing):
+        self.sender(adminId, "Подтвердите начало рассылки уведомления:\n" + self.mailingText + "\n участникам мероприятия: " + self.mailingEvent
+                               + "\n отправив в ответ да/нет", None)
+        self.adminId = adminId
+
     def showRegisteredUsers(self, adminId, uselessParam):
         info = self.googleSheet.getEventsUsersCount()
-        sender(adminId, info, None)
+        self.sender(adminId, info, None)
 
     def getSecondsToDate(self, eventConfirmationTime):
         now = datetime.now()
@@ -129,30 +145,35 @@ class VkBot:
         words = adminCommand.split('\n')
         if(len(words) < 4):
             self.sender(adminId, "Сообщение не удовлетворяет формату", None)
-            return False
+            return 0
 
         password = words[0].rstrip()
         if(password != self.testPassword):
             self.sender(adminId, "Неверный пароль", None)
-            return False
+            return 0
 
-        eventName = words[1].rstrip().lower()
-        if(eventName not in self.eventsList):
+        try:
+            eventName = words[1].rstrip().lower()
+            trueEventName = next(filter(lambda x: x.lower() == eventName, self.eventsList))
+        except Exception:
             self.sender(adminId, "Мероприятие не найдено", None)
-            return False
+            return 0
 
         action = words[2].rstrip().lower()
         if action not in self.adminActions:
             self.sender(adminId, "Действие не найдено", None)
-            return False
+            return 0
 
         del words[0:3]
 
         mailingText = '\n'.join(words)
+
+        if(action != "просмотреть количество зарегистрированных участников"):
+            self.mailingEvent = trueEventName
+            self.mailingText = mailingText
+
         self.adminActions[action](adminId, mailingText)
-        self.mailingEvent = eventName
-        self.adminId = adminId
-        return True
+        return 0
 
     def makeVkLink(self, id):
         return "https://vk.com/id" + str(id)
@@ -229,10 +250,8 @@ class VkBot:
                     
  
                 elif(self.testPassword in msg):
-                    validated = self.validateAdminCommand(id, originalMessage)
-                    if(validated):
-                        self.sender(id, "Подтвердите начало рассылки уведомления:\n" + self.mailingText + "\n участникам мероприятия: " + self.mailingEvent
-                               + "\n отправив в ответ да/нет", None)
+                    self.validateAdminCommand(id, originalMessage)
+
 
                 elif((id in self.confirmationList) and (msg == "да" or msg == "нет")):
                     eventName = self.confirmationList[id]
@@ -242,13 +261,11 @@ class VkBot:
                     self.sender(id, "Ответ внесён", None)
 
                 elif(id == self.adminId and (msg == "да" or msg == "нет")):
-                    if(len(self.mailingText) != 0 and self.adminId != 0):
-                        mailingUsers = self.googleSheet.getUsersForMailing(self.mailingEvent)
-                        mailingThread = Thread(target = self.startMailing, args = (mailingUsers, ))
-                        mailingThread.start()
-
-                        self.adminId = -1
-                        self.mailingEvent = ""
+                    if(msg == "нет"):
+                        self.sender(id, "Отказ от начала рассылки принят", self.controlKeyBoard)
+                        self.clearAdminValues()
+                    elif(msg == "да" and len(self.mailingText) != 0 and self.adminId != 0):
+                        self.preStartMailing()
                     else:
                         self.sender(id, "Я не понял", self.controlKeyBoard)
 

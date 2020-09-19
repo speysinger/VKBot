@@ -28,7 +28,7 @@ class Events(object):
         return self.eventsList[eventName].getEventDate()
 
     def getEvents(self):
-        return self.eventsList.keys()
+        return [*self.eventsList]
 
     def getEvent(self, eventName):
         return self.eventsList[eventName]
