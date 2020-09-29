@@ -3,7 +3,6 @@ import json
 import VkKeyboard
 import re
 from datetime import timedelta, datetime
-from threading import Thread
 from multiprocessing.dummy import Pool as ThreadPool
 import threading
 import UserStatus
@@ -13,7 +12,7 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 
 class VkBot:
     def __init__(self):
-        self.vk_session = vk_api.VkApi(token = "9f9519feae9237afa656cde8dec06d42276b3edc91ff44c8dfe5f5a328b7befac46618f71562abc460a7d")
+        self.vk_session = vk_api.VkApi(token = "")
         self.session_api = self.vk_session.get_api()
         self.longpoll = VkLongPoll(self.vk_session)
 
@@ -251,8 +250,6 @@ class VkBot:
                         self.preStartMailing()
                     else:
                         self.sender(id, "Я не понял", self.controlKeyBoard)
-
-
                 else:
                     if originalMessage in self.eventsList: #если пользователь выбрал какое-то мероприятие
                         self.threadPool.apply_async(self.registerUser, args = (id, originalMessage, ))
