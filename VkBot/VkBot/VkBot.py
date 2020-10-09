@@ -1,7 +1,8 @@
-﻿import vk_api
+import vk_api
 import json
 import VkKeyboard
 import re
+import time
 from datetime import timedelta, datetime
 from multiprocessing.dummy import Pool as ThreadPool
 import threading
@@ -12,7 +13,9 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 
 class VkBot:
     def __init__(self):
-        self.vk_session = vk_api.VkApi(token = "")
+        #dd4ff9616a562be16467f3e4db778ad5781416069a7588b18b695aa8da04a4093bf840f4c701add537524
+        #c92c7c78cd0e3116564fb32d96203a6d8c17ecb3848c70f67ead3fdec09ff8365a0790fc5a7c8e3462ae0
+        self.vk_session = vk_api.VkApi(token = "dd4ff9616a562be16467f3e4db778ad5781416069a7588b18b695aa8da04a4093bf840f4c701add537524")
         self.session_api = self.vk_session.get_api()
         self.longpoll = VkLongPoll(self.vk_session)
 
@@ -27,6 +30,7 @@ class VkBot:
         self.controlKeyBoard = self.keyboard.getControlKeyBoard()
         self.eventKeyBoard = self.keyboard.getEventsKeyBoard(self.eventsList)
         self.yesKeyBoard = self.keyboard.getYesKeyBoard()
+        self.confirmationKeyBoard = self.keyboard.getConfirmationKeyboard()
 
         #adminPart
         self.testPassword = "zdarova2"
@@ -58,7 +62,7 @@ class VkBot:
         nextUpdateTime = (now + timedelta(days = 1)).replace(minute = 0, hour = 4)
         return nextUpdateTime
 
-    def updateEventsList(self):
+    def updateEventsList(self, id):
         self.googleSheet.createEventsTable()
         self.eventsList = self.googleSheet.getEventsList()
         self.eventKeyBoard = self.keyboard.getEventsKeyBoard(self.eventsList)
@@ -73,16 +77,27 @@ class VkBot:
         confirmationText = params['confirmationText']
         usersForConfirmationMailing = self.googleSheet.getUsersForMailing(eventName)
 
-        self.threadPool.apply_async(self.startConfirmation, args = (usersForConfirmationMailing, confirmationText,))
+        self.threadPool.apply_async(self.startConfirmation, args = (usersForConfirmationMailing, confirmationText, eventName,))
 
-    def startConfirmation(self, usersForConfirmationMailing, mailingText):
+    def startConfirmation(self, usersForConfirmationMailing, mailingText, eventName):
+        counter = 0
         for userId in usersForConfirmationMailing:
-            self.sender(userId, mailingText, None)
-            self.confirmationList[int(userId)] = eventName
+            if(counter >= 10):
+                counter = 0
+                time.sleep(0.8)
+            self.sender(userId, mailingText, self.confirmationKeyBoard)
+            id = int(userId)
+            self.confirmationList[id] = eventName
+            counter += 1;
 
     def startMailing(self, usersId):
+        counter = 0
         for userId in usersId:
+            if(counter >= 10):
+                counter = 0
+                time.sleep(0.8)
             self.sender(userId, self.mailingText, None)
+            counter += 1
         self.clearAdminValues()
 
     def setMailing(self, **params):
@@ -196,6 +211,9 @@ class VkBot:
             return True
         return False
 
+    def joinThreads(self):
+        self.threadPool.join()
+
     def sender(self, id, text, keyboard):
         self.session_api.messages.send(user_id = id, message = text, random_id = 0, keyboard = keyboard)
 
@@ -205,7 +223,17 @@ class VkBot:
                 originalMessage = event.text
                 msg = originalMessage.lower()
                 id = event.user_id
-                if(msg == "начать"):
+
+                if(id in self.confirmationList):
+                    if(msg == "да" or msg == "нет"):
+                        eventName = self.confirmationList[id]
+                        self.threadPool.apply_async(self.googleSheet.addUserConfirmationStatus, args = (eventName, self.makeVkLink(id), msg ))
+                        del self.confirmationList[id]
+                        self.sender(id, "Ответ внесён", self.controlKeyBoard)
+                    else:
+                        self.sender(id, "Извините, я не понял команду.", self.confirmationKeyBoard)
+
+                elif(msg == "начать"):
                     self.sender(id, "Выберите действие", self.controlKeyBoard)
 
                 elif(msg == "назад"):
@@ -230,17 +258,11 @@ class VkBot:
                 elif(msg == self.keyboard.get_eventButtonText().lower()):
                     self.threadPool.apply_async(self.showUserEvents, args = (id, ))
 
-                elif(originalMessage == "SECRET_MESSAGE_TO_UPDATE_EVENT_LIST"):
-                    self.threadPool.apply_async(self.updateEventsList, args = ())
+                elif(originalMessage == "update events list"):
+                    self.threadPool.apply_async(self.updateEventsList, args = (id, ))
                     
                 elif(self.testPassword in msg):
                     self.validateAdminCommand(id, originalMessage)
-
-                elif((id in self.confirmationList) and (msg == "да" or msg == "нет")):
-                    eventName = self.confirmationList[id]
-                    self.threadPool.apply_async(self.googleSheet.addUserConfirmationStatus, args = (eventName, self.makeVkLink(id), msg ))
-                    del self.confirmationList[id]
-                    self.sender(id, "Ответ внесён", None)
 
                 elif(id == self.adminId and (msg == "да" or msg == "нет")):
                     if(msg == "нет"):
@@ -249,12 +271,12 @@ class VkBot:
                     elif(msg == "да" and len(self.mailingText) != 0 and self.adminId != 0):
                         self.preStartMailing()
                     else:
-                        self.sender(id, "Я не понял", self.controlKeyBoard)
+                        self.sender(id, "Извините, я не понял команду.", self.controlKeyBoard)
                 else:
-                    if originalMessage in self.eventsList: #если пользователь выбрал какое-то мероприятие
+                    if originalMessage in self.eventsList:
                         self.threadPool.apply_async(self.registerUser, args = (id, originalMessage, ))
 
-                    elif(id in self.userSessions):#этапы регистрации пользователя на мероприятие
+                    elif(id in self.userSessions):
                         userStatus = self.userSessions[id]
                         userStatus.regDate = self.getCurrentDatetime()
 
@@ -297,4 +319,4 @@ class VkBot:
                                 self.userSessions[id] = userStatus
                                 self.sender(id, questionText, None)
                     else:
-                        self.sender(id, "Я не понял", self.controlKeyBoard)
+                        self.sender(id, "Извините, я не понял команду.", self.controlKeyBoard)

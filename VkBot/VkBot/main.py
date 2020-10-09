@@ -1,6 +1,11 @@
 import VkBot
-import asyncio
 
 if __name__ == "__main__":
     bot = VkBot.VkBot()
-    bot.startBot()
+    while(True):
+        try:
+            bot.startBot()
+        except Exception as e:
+            print(e)
+            bot = VkBot.VkBot()
+            bot.startBot()

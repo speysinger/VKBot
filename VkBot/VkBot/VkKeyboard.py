@@ -6,8 +6,15 @@ class Keyboard:
         self.controlKeyboard = VkKeyboard(one_time=False, inline=False)
         self.eventsKeyboard = VkKeyboard(one_time=False, inline=False)
         self.yesKeyBoard = VkKeyboard(one_time = False, inline = False)
+        self.confirmationKeyboard = VkKeyboard(one_time = False, inline = False)
         self.buttonsColor = "positive"
         self.serviceButtonsColor = 'negative'
+
+
+    def getConfirmationKeyboard(self):
+        self.confirmationKeyboard.add_button("Да", self.buttonsColor)
+        self.confirmationKeyboard.add_button("Нет", self.buttonsColor)
+        return self.confirmationKeyboard.get_keyboard()
 
     def getYesKeyBoard(self):
         self.yesKeyBoard.add_button("Да", self.buttonsColor)
@@ -24,12 +31,10 @@ class Keyboard:
         return self.controlKeyboard.get_keyboard()
 
     def getEventsKeyBoard(self, events):
+        self.eventsKeyboard = VkKeyboard(one_time=False, inline=False)
         index = 0
         eventsLen = len(events)
-        even = False
-
-        if(eventsLen % 2 == 0):
-            even = True
+        even = True if eventsLen % 2 == 0 else False
 
         for event in events:
             if(index != 0 and (index % 2 == 0 or (not even and index == eventsLen))):
@@ -45,7 +50,6 @@ class Keyboard:
         self.eventsKeyboard.add_line()
         self.eventsKeyboard.add_button('исправить предыдущий шаг', self.serviceButtonsColor)
         self.eventsKeyboard.add_button('Назад', self.serviceButtonsColor)
-
 
     def get_regButtonText(self):
         return self.registrationButtonText
