@@ -10,7 +10,6 @@ class Keyboard:
         self.buttonsColor = "positive"
         self.serviceButtonsColor = 'negative'
 
-
     def getConfirmationKeyboard(self):
         self.confirmationKeyboard.add_button("Да", self.buttonsColor)
         self.confirmationKeyboard.add_button("Нет", self.buttonsColor)

@@ -3,26 +3,26 @@ import json
 import VkKeyboard
 import re
 import time
+import threading
 from datetime import timedelta, datetime
 from multiprocessing.dummy import Pool as ThreadPool
-import threading
+from vk_api.longpoll import VkLongPoll, VkEventType
 import UserStatus
+import VkKeyboard
 import GoogleSheet
 import Event
-from vk_api.longpoll import VkLongPoll, VkEventType
+
 
 class VkBot:
     def __init__(self):
-        #dd4ff9616a562be16467f3e4db778ad5781416069a7588b18b695aa8da04a4093bf840f4c701add537524
-        #c92c7c78cd0e3116564fb32d96203a6d8c17ecb3848c70f67ead3fdec09ff8365a0790fc5a7c8e3462ae0
-        self.vk_session = vk_api.VkApi(token = "dd4ff9616a562be16467f3e4db778ad5781416069a7588b18b695aa8da04a4093bf840f4c701add537524")
+        self.vk_session = vk_api.VkApi(token = /Токен/)
         self.session_api = self.vk_session.get_api()
         self.longpoll = VkLongPoll(self.vk_session)
 
         try:
             self.googleSheet = GoogleSheet.GoogleSheet()
         except Exception as e:
-            self.sender(200552768, "Что-то не вышло с гугл файлами, вот текст исключения: " + str(e) + "\nЯ, кстати, упал", None)
+            self.sender(/Айди/, "Что-то не вышло с гугл файлами, вот текст исключения: " + str(e) + "\nЯ, кстати, упал", None)
 
         self.keyboard = VkKeyboard.Keyboard()
         self.eventsList = self.googleSheet.getEventsList()
@@ -33,7 +33,7 @@ class VkBot:
         self.confirmationKeyBoard = self.keyboard.getConfirmationKeyboard()
 
         #adminPart
-        self.testPassword = "zdarova2"
+        self.testPassword = /пароль/
         self.clearAdminValues()
         self.adminActions = {
             'начать рассылку': self.confirmationBeforeMailing,
@@ -69,20 +69,20 @@ class VkBot:
         self.sender(id, "Выполнил", None)
 
     def preStartMailing(self):
-        mailingUsers = self.googleSheet.getUsersForMailing(self.mailingEvent)
+        mailingUsers = self.googleSheet.getUsersForMailing(self.mailingEvent, True)
         self.threadPool.apply_async(self.startMailing, args = (mailingUsers, ))
 
     def startConfirmationMailing(self, **params):
         eventName = params['eventName']
         confirmationText = params['confirmationText']
-        usersForConfirmationMailing = self.googleSheet.getUsersForMailing(eventName)
+        usersForConfirmationMailing = self.googleSheet.getUsersForMailing(eventName, False)
 
         self.threadPool.apply_async(self.startConfirmation, args = (usersForConfirmationMailing, confirmationText, eventName,))
 
     def startConfirmation(self, usersForConfirmationMailing, mailingText, eventName):
         counter = 0
         for userId in usersForConfirmationMailing:
-            if(counter >= 10):
+            if(counter >= 8):
                 counter = 0
                 time.sleep(0.8)
             self.sender(userId, mailingText, self.confirmationKeyBoard)
@@ -93,7 +93,7 @@ class VkBot:
     def startMailing(self, usersId):
         counter = 0
         for userId in usersId:
-            if(counter >= 10):
+            if(counter >= 8):
                 counter = 0
                 time.sleep(0.8)
             self.sender(userId, self.mailingText, None)
@@ -211,9 +211,6 @@ class VkBot:
             return True
         return False
 
-    def joinThreads(self):
-        self.threadPool.join()
-
     def sender(self, id, text, keyboard):
         self.session_api.messages.send(user_id = id, message = text, random_id = 0, keyboard = keyboard)
 
@@ -270,6 +267,7 @@ class VkBot:
                         self.clearAdminValues()
                     elif(msg == "да" and len(self.mailingText) != 0 and self.adminId != 0):
                         self.preStartMailing()
+                        self.clearAdminValues()
                     else:
                         self.sender(id, "Извините, я не понял команду.", self.controlKeyBoard)
                 else:
@@ -291,19 +289,18 @@ class VkBot:
                             self.sender(id, "Некорретный формат сообщения\n" + "Пример ответа: " + questionHint, None)
                             continue
             
-      
                         if(userStatus.lastQuestion()):
                             userStatus.addAnswer(originalMessage)
 
                             answers = userStatus.getAnswers()
-                            answers.append('ответа нет')
-                            answers.append(self.makeVkLink(id))
+                            answers.append('ответа нет') #base confirmation status
+                            answers.append(self.makeVkLink(id)) # userId
                             self.threadPool.apply_async(self.googleSheet.insertAnswers, args = (userStatus.getCurrentEvent(), answers,))
 
                             self.sender(id, "Регистрация закончена.\nВы зарегистрированы на: " + userStatus.currentEvent , self.controlKeyBoard)
                             self.userSessions.pop(id, None)
                         else:
-                            if(userStatus.firstQuestion()):
+                            if(userStatus.firstQuestion()): #firstQuestion - Согласие(да/назад)
                                 if(msg != 'да'):
                                     self.sender(id, "Для продолжения нажмите \"Да\"", None)
                                     continue                        

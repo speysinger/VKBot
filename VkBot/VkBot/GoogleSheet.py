@@ -22,10 +22,13 @@ class GoogleSheet:
 
         self.createEventsTable()
 
-    def getColValues(self, eventName):
+    def getColValues(self, eventName, needConfirmation):
         eventWorkSheet = self.eventsWorkSheets[eventName]
         col_count = eventWorkSheet.col_count
-        return eventWorkSheet.col_values(col_count)
+        if(needConfirmation):
+            return eventWorkSheet.col_values(col_count - 1)
+        else:
+            return eventWorkSheet.col_values(col_count)
         
     def createEventsTable(self):
         self.events.clearDictionaries()
@@ -63,7 +66,7 @@ class GoogleSheet:
             self.events.addEvent(workSheetTitle, eventDate, needConfirmation, questionsList, hintsList, regularsList)
     
     def userAlreadyRegistered(self, eventName, userLink):
-        valuesInCol = self.getColValues(eventName)
+        valuesInCol = self.getColValues(eventName, False)
         if userLink in valuesInCol:
             return True
         else:
@@ -73,7 +76,7 @@ class GoogleSheet:
         start = time.time()
         userEvents = []
         for workSheetTitle in self.eventsWorkSheets:
-            valuesInCol = self.getColValues(workSheetTitle)
+            valuesInCol = self.getColValues(workSheetTitle, False)
         
             if userLink in valuesInCol:
                 eventStr = workSheetTitle + " - " + str(self.events.getEventDate(workSheetTitle))
@@ -120,13 +123,24 @@ class GoogleSheet:
         cellRow = userCell.row
         eventWorkSheet.update_cell(cellRow, cellCol, confirmationStatus)
 
-    def getUsersForMailing(self, event):
+    def getUsersForMailing(self, event, needConfirmation):
         onlyId = lambda x: x.partition("https://vk.com/id")[2]
 
-        usersLinks = self.getColValues(event)
-
+        usersLinks = self.getColValues(event, False)
         if(len(usersLinks) > 0):
             usersLinks.pop(0)
+
+        if(needConfirmation):
+            index = 0
+            usersConfirmation = self.getColValues(event, needConfirmation)
+            if(len(usersConfirmation) > 0):
+                usersConfirmation.pop(0)
+
+            for userConfirmation in usersConfirmation:
+                if(userConfirmation == 'нет'):
+                    usersLinks.pop(index)
+                    index -= 1
+                index += 1
 
         usersLinks = [*map(onlyId, usersLinks)]
         return usersLinks
